@@ -1,0 +1,384 @@
+yum -y install m4 gcc redhat-rpm-config xmlto asciidoc elfutils-libelf-devel binutils-devel newt-devel perl-ExtUtils-Embed hmaccalc rng-tools python3-devel libfdt-devel libbsd-devel libfdt
+
+yum install -y xmlto gcc-c++ rpm-build patchutils asciidoc elfutils-libelf-devel zlib-devel binutils-devel newt-devel python-devel hmaccalc perl rng-tools lrzsz openssl-devel popt-devel numactl-devel libbsd-devel
+
+yum install libpcap-devel
+
+系统默认是python3.6，建议安装python3.7
+
+pip3 install meson ninja
+pip3 install pyelftools
+
+
+wget https://pkg-config.freedesktop.org/releases/pkg-config-0.29.2.tar.gz
+tar -zxvf pkg-config-0.29.2.tar.gz 
+cd pkg-config-0.29.2/
+
+./configure --with-internal-glib
+make
+make install
+
+# 检查版本
+pkg-config --version
+0.29.2
+
+# 建议直接在目标目录下载所需源码，以免编译后路径变动
+cd /usr/local
+
+# 最新版则用 git clone，本次拉取时 master 版本为 1.9.0
+git clone https://github.com/iqiyi/dpvs.git
+cd dpvs
+
+# 下载当前版本匹配的 DPDK 源码，20.11.1
+# 官网下载链接：http://core.dpdk.org/download/ 【 以免链接失效 】
+wget https://fast.dpdk.org/rel/dpdk-20.11.1.tar.xz
+tar xf dpdk-20.11.1.tar.xz
+
+
+# 把 DPVS 提供的所有 patch 复制到 DPDK 的根目录下面
+cp patch/dpdk-stable-20.11.1/* dpdk-stable-20.11.1/
+
+# 加载所有补丁
+cd dpdk-stable-20.11.1/
+patch -p 1 < 0001-kni-use-netlink-event-for-multicast-driver-part.patch
+patch -p 1 < 0002-pdump-change-dpdk-pdump-tool-for-dpvs.patch
+patch -p 1 < 0003-debug-enable-dpdk-eal-memory-debug.patch
+patch -p 1 < 0004-ixgbe_flow-patch-ixgbe-fdir-rte_flow-for-dpvs.patch
+patch -p 1 < 0005-bonding-allow-slaves-from-different-numa-nodes.patch
+patch -p 1 < 0006-bonding-fix-bonding-mode-4-problems.patch
+
+编译安装
+利用 meson 生成构建文件，输出至 dpdkbuild
+mkdir dpdklib
+mkdir dpdkbuild
+# meson -Dprefix 需要填写 dpdklib 目录的绝对路径
+meson -Denable_kmods=true -Dprefix=/usr/local/dpvs/dpdk-stable-20.11.1/dpdklib dpdkbuild
+
+Message:
+=================
+Content Skipped
+=================
+
+libs:
+
+drivers:
+common/mvep:	missing dependency, "libmusdk"
+common/mlx5:	missing dependency, "mlx5"
+net/af_xdp:	missing dependency, "libbpf"
+net/mlx4:	missing dependency, "mlx4"
+net/mlx5:	missing internal dependency, "common_mlx5"
+net/mvneta:	missing dependency, "libmusdk"
+net/mvpp2:	missing dependency, "libmusdk"
+net/nfb:	missing dependency, "libnfb"
+net/szedata2:	missing dependency, "libsze2"
+crypto/aesni_gcm:	missing dependency, "libIPSec_MB"
+crypto/aesni_mb:	missing dependency, "libIPSec_MB"
+crypto/armv8:	missing dependency, "libAArch64crypto"
+crypto/kasumi:	missing dependency, "libIPSec_MB"
+crypto/mvsam:	missing dependency, "libmusdk"
+crypto/snow3g:	missing dependency, "libIPSec_MB"
+crypto/zuc:	missing dependency, "libIPSec_MB"
+compress/isal:	missing dependency, "libisal"
+regex/mlx5:	missing internal dependency, "common_mlx5"
+vdpa/mlx5:	missing internal dependency, "common_mlx5"
+
+
+Build targets in project: 1024
+
+Found ninja-1.10.2.git.kitware.jobserver-1 at /usr/local/bin/ninja
+
+
+
+继续使用 ninja 编译与安装
+
+执行编译
+
+bash
+ninja -C dpdkbuild
+输出：
+
+bash
+ninja: Entering directory `dpdkbuild'
+[2434/2463] Generating rte_kni with a custom command
+make: Entering directory `/usr/src/kernels/4.4.215-1.el7.elrepo.x86_64'
+  CC [M]  /usr/local/dpvs/dpdk-stable-20.11.1/dpdkbuild/kernel/linux/kni/kni_net.o
+  CC [M]  /usr/local/dpvs/dpdk-stable-20.11.1/dpdkbuild/kernel/linux/kni/kni_misc.o
+  LD [M]  /usr/local/dpvs/dpdk-stable-20.11.1/dpdkbuild/kernel/linux/kni/rte_kni.o
+  Building modules, stage 2.
+  MODPOST 1 modules
+  CC      /usr/local/dpvs/dpdk-stable-20.11.1/dpdkbuild/kernel/linux/kni/rte_kni.mod.o
+  LD [M]  /usr/local/dpvs/dpdk-stable-20.11.1/dpdkbuild/kernel/linux/kni/rte_kni.ko
+make: Leaving directory `/usr/src/kernels/4.4.215-1.el7.elrepo.x86_64'
+[2463/2463] Linking target app/dpdk-test-bbdev
+安装
+
+bash
+cd dpdkbuild && ninja install
+编译安装DPVS
+声明环境变量
+注意对应环境路径。
+
+bash
+# 注意路径
+export PKG_CONFIG_PATH=/usr/local/dpvs/dpdk-stable-20.11.1/dpdklib/lib64/pkgconfig:/usr/lib64/pkgconfig
+export LIBDPDKPC_PATH=/usr/local/dpvs/dpdk-stable-20.11.1/dpdklib/lib64/pkgconfig/libdpdk.pc
+编译安装
+bash
+cd /usr/local/dpvs
+
+
+
+
+
+make -j 20
+make install -j 20
+注意环境依赖：
+
+Build dependencies may be needed, such as pkg-config(version 0.29.2+),automake, libnl3, libnl-genl-3.0, openssl, popt and numactl. You can install the missing dependencies by using the package manager of the system, e.g., yum install popt-devel (CentOS).
+Early pkg-config versions (v0.29.2 before) may cause dpvs build failure. If so, please upgrade this tool.
+验证 Keepalived 支持功能
+注意查看 make 过程中的提示信息，尤其是 keepalived 部分，如果出现下面的部分则表示 IPVS 支持 IPv6 .
+
+bash
+Keepalived configuration
+------------------------
+Keepalived version       : 2.0.19
+Compiler                 : gcc
+Preprocessor flags       : -D_GNU_SOURCE -I/usr/include/libnl3
+Compiler flags           : -g -g -O2 -fPIE -Wformat -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches -O2
+Linker flags             : -pie -Wl,-z,relro -Wl,-z,now
+Extra Lib                : -lm -lcrypto -lssl -L/usr/lib64 -lnl-genl-3 -lnl-3
+Use IPVS Framework       : Yes
+IPVS use libnl           : Yes
+IPVS syncd attributes    : No
+IPVS 64 bit stats        : No
+HTTP_GET regex support   : No
+fwmark socket support    : Yes
+Use VRRP Framework       : Yes
+Use VRRP VMAC            : Yes
+Use VRRP authentication  : Yes
+With ip rules/routes     : Yes
+With track_process       : Yes
+With linkbeat            : Yes
+Use BFD Framework        : No
+SNMP vrrp support        : No
+SNMP checker support     : No
+SNMP RFCv2 support       : No
+SNMP RFCv3 support       : No
+DBUS support             : No
+SHA1 support             : No
+Use JSON output          : No
+libnl version            : 3
+Use IPv4 devconf         : No
+Use iptables             : Yes
+Use libiptc              : No
+Use libipset             : No
+Use nftables             : No
+init type                : systemd
+Strict config checks     : No
+Build genhash            : Yes
+Build documentation      : No
+验证安装结果
+bash
+# 查看 bin 目录二进制文件
+ls ./bin/
+
+>>>
+dpip  dpvs  ipvsadm  keepalived
+dpvs 是主程序
+dpip 辅助工具，用来设置IP、路由、vlan等等
+ipvsadm 和 keepalived 来自定制(爱奇艺)修改过的 LVS 组件
+检查主程序版本
+
+bash
+./bin/dpvs -v
+
+
+>>>
+dpvs version: 1.9-0, build on 2021.12.19.23:31:03
+启动前配置
+配置hugepage
+和其他的一般程序不同，DPVS 使用的 DPDK 并不是从操作系统中索要内存，而是直接使用大页内存（hugepage），极大地提高了内存分配的效率。
+
+hugepage 的配置比较简单，官方的配置过程中使用的是2MB的大页内存，这里的 4096 指的是分配了 4096 个 2MB 的大页内存，也就是一个 node ( 即一个物理CPU ) 对应 8GB 的内存，如果有两个 node ，则一共分配了 16GB 的内存，这里的内存可以根据机器的大小来自行调整。但是如果小于 1GB 可能会导致启动报错。
+
+单个CPU的系统可以参考dpdk的官方文档
+
+bash
+# for NUMA machine，根据 CPU 个数而定
+echo 4096 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+# 没有第二颗物理CPU，则无需执行该项
+echo 4096 > /sys/devices/system/node/node1/hugepages/hugepages-2048kB/nr_hugepages
+
+mkdir /mnt/huge
+mount -t hugetlbfs nodev /mnt/huge
+
+# 需要开机自动挂载的话可以在
+echo "nodev /mnt/huge hugetlbfs defaults 0 0" >> /etc/fstab
+配置完成后我们可以看到内存的使用率立马上升了
+bash
+# 配置前
+free -g
+              total        used        free      shared  buff/cache   available
+Mem:             15          15           0           0           0           0
+Swap:            15           0          15
+
+---
+
+# 配置后
+free -g
+              total        used        free      shared  buff/cache   available
+Mem:             15           8           5           0           1           6
+Swap:            15           0          15
+使用 numactl 查看内存状态也可以看到确实是单颗CPU分配了8G
+bash
+numactl -H
+
+>>>
+available: 1 nodes (0)
+node 0 cpus: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+node 0 size: 15903 MB
+node 0 free: 5813 MB
+node distances:
+node   0
+  0:  10
+如果有两颗CPU，也可以看到内存各分配了56G
+
+单边分配 28672 个 2M 内存.
+
+bash
+numactl -H
+
+>>>
+available: 2 nodes (0-1)
+node 0 cpus: 0 2 4 6 8 10 12 14 16 18
+node 0 size: 64184 MB
+node 0 free: 4687 MB
+node 1 cpus: 1 3 5 7 9 11 13 15 17 19
+node 1 size: 64494 MB
+node 1 free: 5759 MB
+node distances:
+node   0   1
+0:  10  21
+1:  21  10
+配置ulimit
+默认情况下系统的 ulimit 限制打开的文件描述符数量如果太小会影响 DPVS 正常运行，因此我们将其调大一些：
+
+bash
+ulimit -n 655350
+echo "ulimit -n 655350" >> /etc/rc.local
+chmod a+x /etc/rc.local
+挂载驱动模块
+首先我们需要让系统挂载我们已经编译好的dpdk驱动（PMD驱动），然后再将网卡使用的默认驱动换为我们这里编译好的PMD驱动
+
+bash
+modprobe uio_pci_generic
+
+cd /usr/local/dpvs/dpdk-stable-20.11.1
+insmod dpdkbuild/kernel/linux/kni/rte_kni.ko carrier=on
+
+# 查看模块是否已加载
+lsmod | grep "rte_kni"
+需要注意的是 carrier 参数是从 DPDK v18.11 版本开始新增的，默认值为 off 。
+
+我们需要在加载 rte_kni.ko 模块的时候带上 carrier=on 参数才能够使 KNI 设备工作正常。
+
+挂载网卡驱动
+在 dpdk-stable-20.11.1/usertools 目录下有一些辅助我们安装使用 DPDK 的脚本，我们可以用它们来降低配置的复杂度，这里我们可以使用 dpdk-devbind.py 脚本来变更网卡的驱动。
+
+获取网卡编号
+
+bash
+/usr/local/dpvs/dpdk-stable-20.11.1/usertools/dpdk-devbind.py --status
+
+
+>>>
+Network devices using kernel driver
+===================================
+0000:01:00.0 'I350 Gigabit Network Connection 1521' if=eno1 drv=igb unused=uio_pci_generic
+0000:01:00.1 'I350 Gigabit Network Connection 1521' if=eno2 drv=igb unused=uio_pci_generic
+0000:06:00.0 '82599ES 10-Gigabit SFI/SFP+ Network Connection 10fb' if=eno5 drv=ixgbe unused=uio_pci_generic *Active*
+0000:06:00.1 '82599ES 10-Gigabit SFI/SFP+ Network Connection 10fb' if=eno6 drv=ixgbe unused=uio_pci_generic
+得出本次两张网卡 eno5 、eno6 的网卡编号 ( PCI ID ) 分别为 0000:06:00.0 和0000:06:00.1
+
+注意：
+
+接下来操作可能会导致连接断开，建议使用其它管理网口 、 BMC 或者连接显示器以防连接中断。
+
+关闭网卡，并加载 DPDK 驱动
+
+线上可以使用 && 命令连续执行，或写成启动脚本。
+
+bash
+ifconfig eno5 down
+/usr/local/dpvs/dpdk-stable-20.11.1/usertools/dpdk-devbind.py -b uio_pci_generic 0000:06:00.0
+
+ifconfig eno6 down
+/usr/local/dpvs/dpdk-stable-20.11.1/usertools/dpdk-devbind.py -b uio_pci_generic 0000:06:00.1
+操作前，均为 内核 驱动
+
+
+加载后，出现如下状态，则表明已成功加载 DPDK 驱动
+
+
+启动DPVS
+创建默认配置
+
+bash
+cp conf/dpvs.conf.single-nic.sample /etc/dpvs.conf
+开启 DEBUG 等级日志
+
+vim /etc/dpvs.conf
+
+ini
+! global config
+global_defs {
+    log_level   DEBUG
+    log_file    /var/log/dpvs.log
+    ! 是否异步输出，按需开启
+    ! log_async_mode    on
+    ! pdump       off
+}
+禁用 IPV6 功能 ( 使用 ! 符号进行注释 )
+
+ini
+! dpvs ipv6 config
+!ipv6_defs {
+!    disable                     on
+!    forwarding                  off
+!    route6 {
+!        <init> method           hlist
+!        recycle_time            10
+!    }
+!}
+启动成功
+
+
+
+$ cat setup.sh
+VIP=10.129.39.84
+LIP=10.129.39.16
+RS=10.129.39.104
+
+./dpip addr add 192.168.39.16/24 dev dpdk0
+./dpip addr add 10.129.39.84/24 dev dpdk0
+./ipvsadm -A -t 10.129.39.84:80 -s rr
+./ipvsadm -a -t 10.129.39.84:80 -r 10.129.39.104 -b
+./ipvsadm --add-laddr -z 10.129.39.16 -t 10.129.39.84:80 -F dpdk0
+
+./dpip link set dpdk0 forward2kni on
+tcpdump -i dpdk0.kni  port 80 -vvv
+
+tcpdump -i ens160  port 80 -vvv
+
+
+
+ip addr add 10.129.39.84/32 dev lo
+
+设置内网IP：
+/usr/local/dpvs/bin/dpip addr add 192.168.7.82/24 dev dpdk0
+/usr/local/dpvs/bin/dpip addr add 192.168.7.182/32 dev dpdk0
+
+
+ip addr add 10.129.39.16/24 dev dpdk0.kni
+route add default gw 10.129.39.254 dev dpdk0.kni

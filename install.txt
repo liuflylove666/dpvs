@@ -382,3 +382,16 @@ ip addr add 10.129.39.84/32 dev lo
 
 ip addr add 10.129.39.16/24 dev dpdk0.kni
 route add default gw 10.129.39.254 dev dpdk0.kni
+
+
+
+#############
+
+
+打开调试模式
+vim  dpvs/src/config.mk 
+
+CFLAGS += -D CONFIG_DPVS_NEIGH_DEBUG 取消前面注释
+
+CFLAGS += -D CONFIG_DPVS_IPVS_DEBUG  取消前面注释
+

@@ -133,6 +133,8 @@ static inline int udp_send_csum(int af, int iphdrlen, struct rte_udp_hdr *uh,
                 mbuf->l4_len = sizeof(struct rte_udp_hdr);
                 mbuf->ol_flags |= (PKT_TX_UDP_CKSUM | PKT_TX_IP_CKSUM | PKT_TX_IPV4);
                 uh->dgram_cksum = rte_ipv4_phdr_cksum(iph, mbuf->ol_flags);
+                if (unlikely((dev->flag & NETIF_PORT_FLAG_TX_IP_CSUM_OFFLOAD) != NETIF_PORT_FLAG_TX_IP_CSUM_OFFLOAD))
+                    mbuf->ol_flags &= ~PKT_TX_IP_CKSUM;
             } else {
                 if (mbuf_may_pull(mbuf, mbuf->pkt_len) != 0)
                     return EDPVS_INVPKT;
